@@ -1,0 +1,45 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "PAL portal",
+        "description": "Sign in with your portal.pal-es.com account.",
+        "data": { "username": "Login (e-mail)", "password": "Password" }
+      },
+      "devices": {
+        "title": "Choose devices",
+        "description": "Only the selected devices get entities in Home Assistant. You can change this later in the integration options.",
+        "data": { "devices": "Devices" }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate",
+        "description": "Enter the new password for {username}.",
+        "data": { "password": "Password" }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid login or password",
+      "cannot_connect": "Cannot reach the PAL portal",
+      "no_devices": "No devices found on this account",
+      "select_one": "Select at least one device"
+    },
+    "abort": {
+      "already_configured": "This account is already configured",
+      "reauth_successful": "Re-authentication successful"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "PAL options",
+        "data": {
+          "devices": "Devices",
+          "scan_interval": "Polling interval (s)",
+          "invert_input": "Invert input (active = open)"
+        }
+      }
+    },
+    "error": { "select_one": "Select at least one device" },
+    "abort": { "cannot_connect": "Cannot reach the PAL portal" }
+  }
+}

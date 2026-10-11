@@ -1,0 +1,45 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "PAL портал",
+        "description": "Войдите в аккаунт portal.pal-es.com.",
+        "data": { "username": "Логин (e-mail)", "password": "Пароль" }
+      },
+      "devices": {
+        "title": "Выбор устройств",
+        "description": "Сущности в Home Assistant будут созданы только для выбранных устройств. Список можно изменить позже в настройках интеграции.",
+        "data": { "devices": "Устройства" }
+      },
+      "reauth_confirm": {
+        "title": "Повторная авторизация",
+        "description": "Введите новый пароль для {username}.",
+        "data": { "password": "Пароль" }
+      }
+    },
+    "error": {
+      "invalid_auth": "Неверный логин или пароль",
+      "cannot_connect": "Нет связи с порталом PAL",
+      "no_devices": "В аккаунте нет устройств",
+      "select_one": "Выберите хотя бы одно устройство"
+    },
+    "abort": {
+      "already_configured": "Этот аккаунт уже добавлен",
+      "reauth_successful": "Авторизация обновлена"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Настройки PAL",
+        "data": {
+          "devices": "Устройства",
+          "scan_interval": "Интервал опроса (с)",
+          "invert_input": "Инвертировать вход (active = открыто)"
+        }
+      }
+    },
+    "error": { "select_one": "Выберите хотя бы одно устройство" },
+    "abort": { "cannot_connect": "Нет связи с порталом PAL" }
+  }
+}
