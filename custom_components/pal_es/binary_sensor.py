@@ -11,7 +11,6 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_INVERT
 from .coordinator import PalConfigEntry, PalCoordinator
 from .entity import PalEntity
 
@@ -20,30 +19,26 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: PalConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator = entry.runtime_data
-    invert = bool(entry.options.get(CONF_INVERT, False))
     entities: list[BinarySensorEntity] = []
     for dev_id, item in coordinator.data.items():
         for n in item["inputs"]:
-            entities.append(PalInputSensor(coordinator, dev_id, n, invert))
+            entities.append(PalInputSensor(coordinator, dev_id, n))
         entities.append(PalConnectedSensor(coordinator, dev_id))
     async_add_entities(entities)
 
 
 class PalInputSensor(PalEntity, BinarySensorEntity):
-    """Gate position from the reed input.
+    """Gate position from input N. "on" = open.
 
-    Observed values: "active" / "idle". Default mapping: active = closed,
-    idle = open ("on" = open). Flip with the "invert" option.
+    Whether "active" means open or closed is set per output in the options
+    (normally-open vs normally-closed sensors).
     """
 
     _attr_device_class = BinarySensorDeviceClass.DOOR
 
-    def __init__(
-        self, coordinator: PalCoordinator, device_id: str, n: int, invert: bool
-    ) -> None:
+    def __init__(self, coordinator: PalCoordinator, device_id: str, n: int) -> None:
         super().__init__(coordinator, device_id)
         self._n = n
-        self._invert = invert
         self._attr_unique_id = f"{device_id}_in{n}"
 
     @property
@@ -52,11 +47,10 @@ class PalInputSensor(PalEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        raw = self._inputs.get(self._n)
-        if raw is None:
+        state = self.output_state(self._n)
+        if state == "unknown":
             return None
-        opened = raw != "active"
-        return not opened if self._invert else opened
+        return state == "open"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -64,6 +58,8 @@ class PalInputSensor(PalEntity, BinarySensorEntity):
 
 
 class PalConnectedSensor(PalEntity, BinarySensorEntity):
+    """Connection flag from the device list (refreshed every few minutes)."""
+
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_name = "Connected"

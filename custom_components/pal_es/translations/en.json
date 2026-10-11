@@ -8,7 +8,7 @@
       },
       "devices": {
         "title": "Choose devices",
-        "description": "Only the selected devices get entities in Home Assistant. You can change this later in the integration options.",
+        "description": "Only the selected devices get entities in Home Assistant. You can change this later in the integration options, where you can also set the icon type and input polarity per relay.",
         "data": { "devices": "Devices" }
       },
       "reauth_confirm": {
@@ -32,14 +32,34 @@
     "step": {
       "init": {
         "title": "PAL options",
+        "description": "Choose the devices and how often the gate state is polled. The next steps ask for the icon and the input type of every relay.",
         "data": {
           "devices": "Devices",
-          "scan_interval": "Polling interval (s)",
-          "invert_input": "Invert input (active = open)"
+          "scan_interval": "Polling interval (s)"
+        }
+      },
+      "outputs": {
+        "title": "Relay settings",
+        "description": "{output} ({progress})",
+        "data": {
+          "icon_type": "Icon",
+          "invert": "Input is inverted (active = open)"
+        },
+        "data_description": {
+          "invert": "Off: input \"active\" = closed, \"idle\" = open. Turn on if your sensor works the other way round (normally-open vs normally-closed)."
         }
       }
     },
     "error": { "select_one": "Select at least one device" },
     "abort": { "cannot_connect": "Cannot reach the PAL portal" }
+  },
+  "selector": {
+    "icon_type": {
+      "options": {
+        "swing_gate": "Swing gate",
+        "garage_door": "Up-and-over garage door",
+        "barrier": "Barrier"
+      }
+    }
   }
 }

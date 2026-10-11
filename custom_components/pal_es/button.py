@@ -1,5 +1,12 @@
-"""Open buttons - one per output of every selected device."""
+"""Open buttons - one per relay of every selected device.
+
+The button always works, whatever the input says. Its icon follows the gate
+state and the attribute `gate_state` (open / closed / unknown) can be shown on
+cards, e.g. a camera picture.
+"""
 from __future__ import annotations
+
+from typing import Any
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.core import HomeAssistant
@@ -24,8 +31,6 @@ async def async_setup_entry(
 
 
 class PalOpenButton(PalEntity, ButtonEntity):
-    _attr_icon = "mdi:gate-open"
-
     def __init__(self, coordinator: PalCoordinator, device_id: str, output: int) -> None:
         super().__init__(coordinator, device_id)
         self._output = output
@@ -33,11 +38,25 @@ class PalOpenButton(PalEntity, ButtonEntity):
 
     @property
     def name(self) -> str:
-        return f"Open {self.output_name(self._output)}"
+        return self.output_name(self._output)
+
+    @property
+    def icon(self) -> str:
+        return self.output_icon(self._output)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {
+            "gate_state": self.output_state(self._output),
+            "input_status": self._inputs.get(self._output),
+            "output": self._output,
+        }
 
     async def async_press(self) -> None:
         try:
             await self.coordinator.api.async_open_gate(self._device_id, self._output)
         except PalApiError as err:
-            raise HomeAssistantError(f"Cannot open {self.output_name(self._output)}: {err}") from err
+            raise HomeAssistantError(
+                f"Cannot open {self.output_name(self._output)}: {err}"
+            ) from err
         self.coordinator.schedule_refreshes_after_open()

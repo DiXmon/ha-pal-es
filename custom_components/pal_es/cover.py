@@ -1,4 +1,9 @@
-"""Gate entity: shows open/closed from the reed input and opens via the portal."""
+"""Optional gate (cover) entity: open/closed state plus an "open" command.
+
+Disabled by default for new installs. Home Assistant greys out the "open"
+control of a cover that is already open, so for one-tap opening use the button
+entity; enable this one for voice assistants / HomeKit or the state tile.
+"""
 from __future__ import annotations
 
 from homeassistant.components.cover import (
@@ -11,7 +16,6 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .api import PalApiError
-from .const import CONF_INVERT
 from .coordinator import PalConfigEntry, PalCoordinator
 from .entity import PalEntity
 
@@ -29,15 +33,10 @@ async def async_setup_entry(
 
 
 class PalGate(PalEntity, CoverEntity):
-    """PAL can only trigger the output, so the only command is "open".
+    """PAL can only trigger the relay, so the only command is "open"."""
 
-    State comes from input N (reed switch). Default mapping: input "active" =
-    closed, anything else = open; the "invert" option flips it. Without a
-    readable input the state is unknown, opening still works.
-    """
-
-    _attr_device_class = CoverDeviceClass.GATE
     _attr_supported_features = CoverEntityFeature.OPEN
+    _attr_entity_registry_enabled_default = False
 
     def __init__(self, coordinator: PalCoordinator, device_id: str, output: int) -> None:
         super().__init__(coordinator, device_id)
@@ -49,14 +48,21 @@ class PalGate(PalEntity, CoverEntity):
         return self.output_name(self._output)
 
     @property
+    def device_class(self) -> CoverDeviceClass:
+        if self.output_icon_type(self._output) == "garage_door":
+            return CoverDeviceClass.GARAGE
+        return CoverDeviceClass.GATE
+
+    @property
+    def icon(self) -> str:
+        return self.output_icon(self._output)
+
+    @property
     def is_closed(self) -> bool | None:
-        raw = self._inputs.get(self._output)
-        if raw is None:
+        state = self.output_state(self._output)
+        if state == "unknown":
             return None
-        closed = raw == "active"
-        if self.coordinator.config_entry.options.get(CONF_INVERT, False):
-            closed = not closed
-        return closed
+        return state == "closed"
 
     async def async_open_cover(self, **kwargs) -> None:
         try:

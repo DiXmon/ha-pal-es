@@ -1,15 +1,18 @@
 # PAL ES Gates for Home Assistant (unofficial)
 
-Open your PAL gates/barriers from Home Assistant and see the gate input (reed switch) state.
-Works with accounts on [portal.pal-es.com](https://portal.pal-es.com).
+Open your PAL gates, barriers and garage doors from Home Assistant and see their state
+(reed switch / input). Works with accounts on [portal.pal-es.com](https://portal.pal-es.com).
 
-- Choose **which** devices appear in Home Assistant (you can change it later in the integration options).
-- A **gate** (`cover`) per output showing *open/closed* from the reed input, with an **Open** command.
-  Use this one on your dashboard (tile card).
-- A plain **Open** button per output, e.g. `button.ewatrade_open_szlaban`.
-- **Input state** binary sensor (door) per input, plus a diagnostic **Connected** sensor.
+- Choose **which** devices appear in Home Assistant (changeable later in the integration options).
+- Devices with **one or two relays/inputs** are supported. Names come from the portal fields
+  `name1` / `name2`.
+- An **Open button** per relay. It always works, whatever the input says. Its icon follows the
+  gate state, and the attribute `gate_state` (`open` / `closed` / `unknown`) is available for cards.
+- An **input state** binary sensor (door) per input, plus a diagnostic **Connected** sensor.
+- Per relay you can choose the **icon type** (swing gate, up-and-over garage door, barrier) and
+  the **input polarity** (normally-open or normally-closed sensor).
+- An optional **gate (cover)** entity, disabled by default (for voice assistants / HomeKit).
 - The portal token is renewed automatically (it lives about 24 h).
-- Cloud polling (default 10 s, configurable).
 
 > Unofficial integration, not affiliated with PAL. Provided "as is".
 
@@ -23,7 +26,6 @@ Works with accounts on [portal.pal-es.com](https://portal.pal-es.com).
 6. Enter your portal login/password, then tick the devices you want.
 
 Manual install: copy `custom_components/pal_es` into your HA `config/custom_components/` and restart.
-
 Requires Home Assistant 2025.1.0 or newer.
 
 ## Options
@@ -33,10 +35,75 @@ Settings → Devices & services → PAL ES Gates → **Configure**:
 | Option | Meaning |
 | --- | --- |
 | Devices | Which devices are exposed. Un-ticked devices are removed from HA. |
-| Polling interval | 3–300 s. Each poll = 1 list request + 1 request per selected device. |
-| Invert input | By default input `active` = closed, `idle` = open. Tick this if your wiring is the opposite. |
+| Polling interval | 3–300 s, default 10 s. One request per selected device per poll. |
+| Icon (per relay) | Swing gate, up-and-over garage door or barrier. Open and closed icons differ. |
+| Input is inverted (per relay) | Off: input `active` = closed, `idle` = open. On: the opposite. |
 
 The raw value is always available in the sensor attribute `raw_status`.
+
+## How the state is determined
+
+The device reports its input to the PAL cloud. Home Assistant asks the portal for that status
+every polling interval (default 10 s), so a change shows up with a delay of up to one interval.
+Right after you press *Open* the status is read again after 3 s and 8 s. The portal's device
+list (names, connected flag) is refreshed every 5 minutes. There is no push channel, so the
+state is "as of the last poll".
+
+## Dashboard examples
+
+Use the Open **button** entity (its id is `button.<device>_<name>`; check it on the device page).
+
+Button card with state:
+
+```yaml
+type: button
+entity: button.ewatrade_szlaban
+name: Szlaban
+tap_action:
+  action: perform-action
+  perform_action: button.press
+  target:
+    entity_id: button.ewatrade_szlaban
+```
+
+Tile showing the gate state text:
+
+```yaml
+type: tile
+entity: button.ewatrade_szlaban
+name: Szlaban
+state_content: gate_state
+tap_action:
+  action: perform-action
+  perform_action: button.press
+  target:
+    entity_id: button.ewatrade_szlaban
+```
+
+Open button on a camera picture (picture-elements card):
+
+```yaml
+type: picture-elements
+camera_image: camera.gate_camera
+elements:
+  - type: state-icon
+    entity: button.ewatrade_szlaban
+    style:
+      top: 90%
+      left: 90%
+    tap_action:
+      action: perform-action
+      perform_action: button.press
+      target:
+        entity_id: button.ewatrade_szlaban
+  - type: state-badge
+    entity: binary_sensor.ewatrade_szlaban_state
+    style:
+      top: 90%
+      left: 10%
+```
+
+Add a `confirmation:` block under `tap_action` (e.g. `text: Open the gate?`) to avoid accidental taps.
 
 ## Reporting problems
 

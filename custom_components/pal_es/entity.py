@@ -6,8 +6,9 @@ from typing import Any
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import CONF_ICON_TYPE, CONF_OUTPUT_INVERT, DOMAIN
 from .coordinator import PalCoordinator
+from .logic import GateState, gate_icon, gate_state, output_settings
 
 
 class PalEntity(CoordinatorEntity[PalCoordinator]):
@@ -39,4 +40,22 @@ class PalEntity(CoordinatorEntity[PalCoordinator]):
         return super().available and self._device_id in self.coordinator.data
 
     def output_name(self, n: int) -> str:
+        """Name of relay n: the portal's name1 / name2 field."""
         return self._info.get(f"name{n}") or f"Output {n}"
+
+    def output_state(self, n: int) -> GateState:
+        settings = output_settings(
+            self.coordinator.config_entry.options, self._device_id, n
+        )
+        return gate_state(self._inputs.get(n), settings[CONF_OUTPUT_INVERT])
+
+    def output_icon(self, n: int) -> str:
+        settings = output_settings(
+            self.coordinator.config_entry.options, self._device_id, n
+        )
+        return gate_icon(settings[CONF_ICON_TYPE], self.output_state(n))
+
+    def output_icon_type(self, n: int) -> str:
+        return output_settings(
+            self.coordinator.config_entry.options, self._device_id, n
+        )[CONF_ICON_TYPE]

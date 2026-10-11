@@ -20,14 +20,18 @@ from homeassistant.helpers.selector import (
 from .api import PalApi, PalApiError, PalAuthError
 from .const import (
     CONF_DEVICES,
-    CONF_INVERT,
+    CONF_ICON_TYPE,
+    CONF_OUTPUT_INVERT,
+    CONF_OUTPUTS,
     CONF_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    ICONS,
     MAX_SCAN_INTERVAL,
     MIN_SCAN_INTERVAL,
 )
 from .coordinator import PalConfigEntry
+from .logic import output_key, output_settings
 
 
 def _device_label(dev: dict[str, Any]) -> str:
@@ -144,7 +148,13 @@ class PalConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class PalOptionsFlow(OptionsFlow):
-    """Change the exposed devices, polling interval, input polarity."""
+    """Step 1: devices + polling. Then one step per relay: icon type and input polarity."""
+
+    def __init__(self) -> None:
+        self._base: dict[str, Any] = {}
+        self._pairs: list[tuple[str, int, str]] = []
+        self._idx = 0
+        self._outputs: dict[str, dict[str, Any]] = {}
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -166,7 +176,26 @@ class PalOptionsFlow(OptionsFlow):
             if not user_input[CONF_DEVICES]:
                 errors["base"] = "select_one"
             else:
-                return self.async_create_entry(data=user_input)
+                self._base = {
+                    CONF_DEVICES: user_input[CONF_DEVICES],
+                    CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
+                }
+                by_id = {d["_id"]: d for d in devices}
+                self._pairs = []
+                for dev_id in user_input[CONF_DEVICES]:
+                    dev = by_id.get(dev_id)
+                    if not dev:
+                        continue
+                    for n in range(1, int(dev.get("outputs") or 1) + 1):
+                        label = f"{dev.get('name') or dev_id} / {dev.get(f'name{n}') or f'Output {n}'}"
+                        self._pairs.append((dev_id, n, label))
+                self._idx = 0
+                self._outputs = {}
+                if not self._pairs:
+                    return self.async_create_entry(
+                        data={**self._base, CONF_OUTPUTS: {}}
+                    )
+                return await self.async_step_outputs()
 
         opts = entry.options
         schema = vol.Schema(
@@ -180,7 +209,48 @@ class PalOptionsFlow(OptionsFlow):
                 ): vol.All(
                     vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL, max=MAX_SCAN_INTERVAL)
                 ),
-                vol.Required(CONF_INVERT, default=opts.get(CONF_INVERT, False)): bool,
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
+
+    async def async_step_outputs(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            dev_id, n, _ = self._pairs[self._idx]
+            self._outputs[output_key(dev_id, n)] = {
+                CONF_ICON_TYPE: user_input[CONF_ICON_TYPE],
+                CONF_OUTPUT_INVERT: user_input[CONF_OUTPUT_INVERT],
+            }
+            self._idx += 1
+            if self._idx >= len(self._pairs):
+                return self.async_create_entry(
+                    data={**self._base, CONF_OUTPUTS: self._outputs}
+                )
+
+        dev_id, n, label = self._pairs[self._idx]
+        current = output_settings(self.config_entry.options, dev_id, n)
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_ICON_TYPE, default=current[CONF_ICON_TYPE]
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=list(ICONS),
+                        translation_key=CONF_ICON_TYPE,
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    CONF_OUTPUT_INVERT, default=current[CONF_OUTPUT_INVERT]
+                ): bool,
+            }
+        )
+        return self.async_show_form(
+            step_id="outputs",
+            data_schema=schema,
+            description_placeholders={
+                "output": label,
+                "progress": f"{self._idx + 1}/{len(self._pairs)}",
+            },
+        )
