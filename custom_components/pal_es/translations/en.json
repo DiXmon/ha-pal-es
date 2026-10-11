@@ -32,7 +32,7 @@
     "step": {
       "init": {
         "title": "PAL options",
-        "description": "Choose the devices and how often the gate state is polled. The next steps ask for the icon and the input type of every relay.",
+        "description": "Step 1: choose the devices and how often the gate state is polled. Press NEXT: the following screens set the icon (gate / garage door / barrier) and the input type (active = open or closed) for every relay.",
         "data": {
           "devices": "Devices",
           "scan_interval": "Polling interval (s)"

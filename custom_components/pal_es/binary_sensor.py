@@ -21,7 +21,8 @@ async def async_setup_entry(
     coordinator = entry.runtime_data
     entities: list[BinarySensorEntity] = []
     for dev_id, item in coordinator.data.items():
-        for n in item["inputs"]:
+        # "outputs" is the number of relays and of inputs of the device.
+        for n in range(1, int(item["info"].get("outputs") or 1) + 1):
             entities.append(PalInputSensor(coordinator, dev_id, n))
         entities.append(PalConnectedSensor(coordinator, dev_id))
     async_add_entities(entities)
@@ -62,11 +63,14 @@ class PalConnectedSensor(PalEntity, BinarySensorEntity):
 
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
     _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_name = "Connected"
 
     def __init__(self, coordinator: PalCoordinator, device_id: str) -> None:
         super().__init__(coordinator, device_id)
         self._attr_unique_id = f"{device_id}_connected"
+
+    @property
+    def name(self) -> str:
+        return f"{self._info.get('name') or self._device_id} connected"
 
     @property
     def is_on(self) -> bool | None:

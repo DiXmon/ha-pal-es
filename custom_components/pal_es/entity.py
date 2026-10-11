@@ -12,7 +12,9 @@ from .logic import GateState, gate_icon, gate_state, output_settings
 
 
 class PalEntity(CoordinatorEntity[PalCoordinator]):
-    _attr_has_entity_name = True
+    # False: entity names are used as they are (name1 / name2 from the portal),
+    # without the device name in front of them.
+    _attr_has_entity_name = False
 
     def __init__(self, coordinator: PalCoordinator, device_id: str) -> None:
         super().__init__(coordinator)

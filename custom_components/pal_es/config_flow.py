@@ -211,7 +211,10 @@ class PalOptionsFlow(OptionsFlow):
                 ),
             }
         )
-        return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
+        # last_step=False: the button reads "Next" - the relay settings follow.
+        return self.async_show_form(
+            step_id="init", data_schema=schema, errors=errors, last_step=False
+        )
 
     async def async_step_outputs(
         self, user_input: dict[str, Any] | None = None
@@ -253,4 +256,5 @@ class PalOptionsFlow(OptionsFlow):
                 "output": label,
                 "progress": f"{self._idx + 1}/{len(self._pairs)}",
             },
+            last_step=self._idx == len(self._pairs) - 1,
         )

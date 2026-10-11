@@ -4,8 +4,9 @@ Open your PAL gates, barriers and garage doors from Home Assistant and see their
 (reed switch / input). Works with accounts on [portal.pal-es.com](https://portal.pal-es.com).
 
 - Choose **which** devices appear in Home Assistant (changeable later in the integration options).
-- Devices with **one or two relays/inputs** are supported. Names come from the portal fields
-  `name1` / `name2`.
+- Devices with **one or two relays/inputs** are supported (the portal field `outputs` says how
+  many). Entity names are taken from the portal fields `name1` / `name2` only, without the
+  device name, e.g. `button.szlaban`.
 - An **Open button** per relay. It always works, whatever the input says. Its icon follows the
   gate state, and the attribute `gate_state` (`open` / `closed` / `unknown`) is available for cards.
 - An **input state** binary sensor (door) per input, plus a diagnostic **Connected** sensor.
@@ -39,7 +40,17 @@ Settings → Devices & services → PAL ES Gates → **Configure**:
 | Icon (per relay) | Swing gate, up-and-over garage door or barrier. Open and closed icons differ. |
 | Input is inverted (per relay) | Off: input `active` = closed, `idle` = open. On: the opposite. |
 
+The options are a two-step dialog: step 1 (devices, polling) ends with **Next**; the following
+screens (one per relay) set the icon and the input polarity. The last one ends with **Submit**.
+
 The raw value is always available in the sensor attribute `raw_status`.
+
+### Home Assistant's default "Overview" dashboard
+
+If you use the automatic *Przegląd / Overview* dashboard, open its edit dialog (pencil → *Personalize*).
+Entities shown under **Favorites** are either the ones you pinned (*Add favorite*) or, when
+**Suggested entities** is on, ones Home Assistant adds because you use them often. Turn
+*Suggested entities* off if you want only the entities you pinned yourself.
 
 ## How the state is determined
 
