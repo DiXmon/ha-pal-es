@@ -40,6 +40,7 @@ class FakePortal:
         self.logins = 0
         self.tokens: list[str] = []
         self.fail_next_with_401 = False
+        self.fail_next_with_err = False  # HTTP 200 with an "err" body
         self.gate_confirmed = True
         self.opened: list[tuple[str, dict]] = []
         self.token_exp_ms = int((time.time() + 86400) * 1000)
@@ -68,9 +69,17 @@ class FakePortal:
             return False
         return req.headers.get("X-Access-Token") == (self.tokens[-1] if self.tokens else None)
 
+    def _soft_error(self) -> web.Response | None:
+        if self.fail_next_with_err:
+            self.fail_next_with_err = False
+            return web.json_response({"err": "token", "errId": 9, "msg": "Invalid token"})
+        return None
+
     async def devices(self, req: web.Request) -> web.Response:
         if not self._auth(req):
             return web.json_response({"err": "auth"}, status=401)
+        if (soft := self._soft_error()) is not None:
+            return soft
         return web.json_response(
             {
                 "err": None,
@@ -91,6 +100,8 @@ class FakePortal:
     async def open_gate(self, req: web.Request) -> web.Response:
         if not self._auth(req):
             return web.json_response({"err": "auth"}, status=401)
+        if (soft := self._soft_error()) is not None:
+            return soft
         self.opened.append((req.match_info["id"], await req.json()))
         return web.json_response(
             {"err": None, "msg": f"Gate opened: {self.gate_confirmed}", "confirmed": self.gate_confirmed}
@@ -139,11 +150,47 @@ def test_wrong_password():
 
 def test_relogin_after_401():
     async def go(portal, api):
+        api._relogin_cooldown = 0
         await api.async_get_devices()
         assert portal.logins == 1
         portal.fail_next_with_401 = True
         await api.async_get_devices()  # server rejects once -> client logs in again
         assert portal.logins == 2
+
+    run(go)
+
+
+def test_get_relogin_on_soft_error_in_200_body():
+    async def go(portal, api):
+        api._relogin_cooldown = 0
+        await api.async_get_devices()
+        portal.fail_next_with_err = True  # revoked token reported as HTTP 200 + err
+        devices = await api.async_get_devices()
+        assert devices and portal.logins == 2
+
+    run(go)
+
+
+def test_post_is_never_retried_on_soft_error():
+    async def go(portal, api):
+        api._relogin_cooldown = 0
+        await api.async_get_devices()
+        portal.fail_next_with_err = True
+        with pytest.raises(PalApiError):
+            await api.async_open_gate("4G610204136", 1)
+        assert portal.opened == []  # not repeated
+        assert portal.logins == 1
+
+    run(go)
+
+
+def test_cooldown_prevents_login_storm():
+    async def go(portal, api):
+        await api.async_get_devices()  # fresh login, default 30 s cooldown active
+        portal.fail_next_with_401 = True
+        with pytest.raises(PalApiError):
+            await api.async_get_devices()
+        assert portal.logins == 1  # no second login right after the first
 
     run(go)
 

@@ -13,6 +13,9 @@ DEFAULT_SCAN_INTERVAL = 10  # seconds
 MIN_SCAN_INTERVAL = 3
 MAX_SCAN_INTERVAL = 300
 
+# Minimum seconds between a login and a login forced by a rejected request.
+RELOGIN_COOLDOWN = 30
+
 # Re-login when the token has less than this many seconds left.
 TOKEN_REFRESH_MARGIN = 300
 

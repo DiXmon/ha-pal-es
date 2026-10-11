@@ -10,7 +10,7 @@ from typing import Any
 
 import aiohttp
 
-from .const import BASE_URL, TOKEN_REFRESH_MARGIN
+from .const import BASE_URL, RELOGIN_COOLDOWN, TOKEN_REFRESH_MARGIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,6 +48,10 @@ class PalApi:
         self._token: str | None = None
         self._token_exp: float | None = None
         self._lock = asyncio.Lock()
+        self._last_login: float = 0.0
+        # Do not log in again because of a rejected request sooner than this
+        # (protects against login storms and kicking other sessions).
+        self._relogin_cooldown: float = RELOGIN_COOLDOWN
 
     # ------------------------------------------------------------------ auth
     async def async_login(self) -> None:
@@ -69,6 +73,7 @@ class PalApi:
             raise PalAuthError(msg or "login failed")
         self._token = token
         self._token_exp = _jwt_exp_seconds(token)
+        self._last_login = time.time()
 
     def _token_valid(self) -> bool:
         if not self._token:
@@ -85,35 +90,57 @@ class PalApi:
                 await self.async_login()
 
     # --------------------------------------------------------------- requests
+    def _may_relogin(self) -> bool:
+        return time.time() - self._last_login >= self._relogin_cooldown
+
     async def _request(
         self,
         method: str,
         path: str,
         body: dict[str, Any] | None = None,
-        _retry: bool = True,
     ) -> dict[str, Any]:
-        await self._ensure_token()
-        headers = {
-            "Accept": "application/json, text/plain, */*",
-            "X-Access-Token": self._token or "",
-            "X-Pal-P-T": "",
-        }
-        try:
-            async with self._session.request(
-                method,
-                f"{BASE_URL}{path}",
-                json=body,
-                headers=headers,
-                timeout=_TIMEOUT,
-            ) as resp:
-                status = resp.status
-                data = await resp.json(content_type=None)
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            raise PalApiError(f"Request {path} failed: {err}") from err
+        """Send a request; on a rejected token log in again and retry once.
 
-        if status in (401, 403) and _retry:
-            self._token = None  # force fresh login
-            return await self._request(method, path, body, _retry=False)
+        Retry rules (the portal's reply to an expired/revoked token is not
+        documented, so we are deliberately defensive):
+        * HTTP 401/403 -> new login + retry, for any method.
+        * HTTP 200 with an "err" body -> new login + retry, but only for GET.
+          A POST (open-gate) is never repeated on a vague error, so the gate
+          cannot be triggered twice.
+        * Never more than one retry, and not within the cooldown after a login.
+        """
+        for attempt in (1, 2):
+            await self._ensure_token()
+            headers = {
+                "Accept": "application/json, text/plain, */*",
+                "X-Access-Token": self._token or "",
+                "X-Pal-P-T": "",
+            }
+            try:
+                async with self._session.request(
+                    method,
+                    f"{BASE_URL}{path}",
+                    json=body,
+                    headers=headers,
+                    timeout=_TIMEOUT,
+                ) as resp:
+                    status = resp.status
+                    data = await resp.json(content_type=None)
+            except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+                raise PalApiError(f"Request {path} failed: {err}") from err
+
+            auth_rejected = status in (401, 403)
+            body_error = isinstance(data, dict) and bool(data.get("err"))
+            if (
+                attempt == 1
+                and (auth_rejected or (body_error and method == "GET"))
+                and self._may_relogin()
+            ):
+                _LOGGER.debug("Request %s rejected, logging in again", path)
+                self._token = None
+                continue
+            break
+
         if status >= 400:
             raise PalApiError(f"HTTP {status} for {path}")
         if not isinstance(data, dict):

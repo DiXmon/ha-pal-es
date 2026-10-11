@@ -10,7 +10,7 @@ from .api import PalApi
 from .const import DOMAIN
 from .coordinator import PalConfigEntry, PalCoordinator
 
-PLATFORMS = [Platform.BUTTON, Platform.BINARY_SENSOR]
+PLATFORMS = [Platform.COVER, Platform.BUTTON, Platform.BINARY_SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: PalConfigEntry) -> bool:

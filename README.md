@@ -4,8 +4,11 @@ Open your PAL gates/barriers from Home Assistant and see the gate input (reed sw
 Works with accounts on [portal.pal-es.com](https://portal.pal-es.com).
 
 - Choose **which** devices appear in Home Assistant (you can change it later in the integration options).
-- One **Open** button per output, e.g. `button.ewatrade_open_szlaban`.
+- A **gate** (`cover`) per output showing *open/closed* from the reed input, with an **Open** command.
+  Use this one on your dashboard (tile card).
+- A plain **Open** button per output, e.g. `button.ewatrade_open_szlaban`.
 - **Input state** binary sensor (door) per input, plus a diagnostic **Connected** sensor.
+- The portal token is renewed automatically (it lives about 24 h).
 - Cloud polling (default 10 s, configurable).
 
 > Unofficial integration, not affiliated with PAL. Provided "as is".
