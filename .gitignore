@@ -4,3 +4,4 @@ __pycache__/
 dev/config/
 pal_probe_output.txt
 .venv/
+.DS_Store
