@@ -57,7 +57,7 @@ Entities shown under **Favorites** are either the ones you pinned (*Add favorite
 The device reports its input to the PAL cloud. The portal also publishes an MQTT event
 (`org/<orgId>/evt/device/<deviceId>/...`) whenever a device reports something. The integration
 listens to it (WebSocket, `wss://portal.pal-es.com/mqtt`, port 443, your own organisation's topics only);
-on an event it reads the input status of that one device, 1 s and 4 s later. So a change shows up
+on an event it reads the input status of that one device immediately (and once more after 3 s if nothing changed yet). So a change shows up
 within a couple of seconds and nothing is polled in between.
 
 As a safety net the status is still read every 5 minutes while MQTT is connected, and every

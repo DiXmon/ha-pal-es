@@ -45,5 +45,6 @@ MQTT_USERNAME = "adminApp"  # the portal's web app logs in with this user name +
 MQTT_KEEPALIVE = 30
 # While MQTT is connected, poll only this rarely (safety net for missed events).
 MQTT_FALLBACK_INTERVAL = 300
-# After an MQTT event for a device, read its input status after these delays (s).
-EVENT_REFRESH_DELAYS = (1, 4)
+# After an MQTT event the input status is read at once; if it has not changed yet
+# (the portal may update it a moment later) it is read once more after this delay (s).
+EVENT_RETRY_DELAY = 3

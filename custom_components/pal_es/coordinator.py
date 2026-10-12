@@ -21,7 +21,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DEVICE_LIST_REFRESH,
     DOMAIN,
-    EVENT_REFRESH_DELAYS,
+    EVENT_RETRY_DELAY,
     MQTT_FALLBACK_INTERVAL,
     POST_OPEN_REFRESH_DELAYS,
 )
@@ -137,20 +137,14 @@ class PalCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         _LOGGER.debug("MQTT %s, poll interval %s", "connected" if connected else "down", self.update_interval)
 
     def handle_device_event(self, device_id: str) -> None:
-        """The portal reported something for a device: read its input status."""
+        """The portal reported something for a device: read its input status now."""
         if device_id not in self.selected_ids or self.data is None:
             return
         for cancel in self._event_timers.pop(device_id, []):
             cancel()
+        self.hass.async_create_task(self._async_refresh_device(device_id, retry=True))
 
-        async def _refresh(_now: Any) -> None:
-            await self._async_refresh_device(device_id)
-
-        self._event_timers[device_id] = [
-            async_call_later(self.hass, delay, _refresh) for delay in EVENT_REFRESH_DELAYS
-        ]
-
-    async def _async_refresh_device(self, device_id: str) -> None:
+    async def _async_refresh_device(self, device_id: str, retry: bool = False) -> None:
         current = (self.data or {}).get(device_id)
         if current is None:
             return
@@ -165,6 +159,14 @@ class PalCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             data = dict(self.data)
             data[device_id] = {"info": current["info"], "inputs": inputs}
             self.async_set_updated_data(data)
+        elif retry:
+            # Unchanged: the portal may not have processed the event yet. One more look.
+            async def _again(_now: Any) -> None:
+                await self._async_refresh_device(device_id)
+
+            self._event_timers[device_id] = [
+                async_call_later(self.hass, EVENT_RETRY_DELAY, _again)
+            ]
 
     def schedule_refreshes_after_open(self) -> None:
         """Poll a bit faster right after a gate was triggered."""
