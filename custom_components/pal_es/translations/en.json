@@ -4,17 +4,24 @@
       "user": {
         "title": "PAL portal",
         "description": "Sign in with your portal.pal-es.com account.",
-        "data": { "username": "Login (e-mail)", "password": "Password" }
+        "data": {
+          "username": "Login (e-mail)",
+          "password": "Password"
+        }
       },
       "devices": {
         "title": "Choose devices",
         "description": "Only the selected devices get entities in Home Assistant. You can change this later in the integration options, where you can also set the icon type and input polarity per relay.",
-        "data": { "devices": "Devices" }
+        "data": {
+          "devices": "Devices"
+        }
       },
       "reauth_confirm": {
         "title": "Re-authenticate",
         "description": "Enter the new password for {username}.",
-        "data": { "password": "Password" }
+        "data": {
+          "password": "Password"
+        }
       }
     },
     "error": {
@@ -32,10 +39,10 @@
     "step": {
       "init": {
         "title": "PAL options",
-        "description": "Step 1: choose the devices and how often the gate state is polled. Press NEXT: the following screens set the icon (gate / garage door / barrier) and the input type (active = open or closed) for every relay.",
+        "description": "Step 1: choose the devices and the fallback polling interval (used only while the portal's MQTT push is not connected). Press NEXT: the following screens set the icon (gate / garage door / barrier) and the input type (active = open or closed) for every relay.",
         "data": {
           "devices": "Devices",
-          "scan_interval": "Polling interval (s)"
+          "scan_interval": "Fallback polling interval (s)"
         }
       },
       "outputs": {
@@ -50,8 +57,12 @@
         }
       }
     },
-    "error": { "select_one": "Select at least one device" },
-    "abort": { "cannot_connect": "Cannot reach the PAL portal" }
+    "error": {
+      "select_one": "Select at least one device"
+    },
+    "abort": {
+      "cannot_connect": "Cannot reach the PAL portal"
+    }
   },
   "selector": {
     "icon_type": {

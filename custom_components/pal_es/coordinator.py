@@ -21,6 +21,8 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DEVICE_LIST_REFRESH,
     DOMAIN,
+    EVENT_REFRESH_DELAYS,
+    MQTT_FALLBACK_INTERVAL,
     POST_OPEN_REFRESH_DELAYS,
 )
 
@@ -28,11 +30,24 @@ _LOGGER = logging.getLogger(__name__)
 
 _INPUT_KEY = re.compile(r"^in(\d+)Status$")
 
+def _parse_inputs(source: dict[str, Any]) -> dict[int, str | None]:
+    inputs: dict[int, str | None] = {}
+    for key, value in source.items():
+        if m := _INPUT_KEY.match(key):
+            inputs[int(m.group(1))] = value
+    return inputs
+
+
 type PalConfigEntry = ConfigEntry[PalCoordinator]
 
 
 class PalCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
     """Polls the input status of the devices the user selected.
+
+    Normally the portal pushes an MQTT event when a device reports something;
+    that triggers a read of just that device. The regular poll then only runs
+    as a rare safety net (MQTT_FALLBACK_INTERVAL) and at the configured
+    polling interval while MQTT is not connected.
 
     Every poll costs one request per selected device (get-input-status). The
     device list (names, connected flag) is fetched at start and then only every
@@ -57,6 +72,9 @@ class PalCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         self._pending: list[CALLBACK_TYPE] = []
         self._devices: dict[str, dict[str, Any]] | None = None
         self._devices_at: float = 0.0
+        self._poll_interval = timedelta(seconds=interval)
+        self._event_timers: dict[str, list[CALLBACK_TYPE]] = {}
+        self.mqtt_connected = False
 
     @property
     def selected_ids(self) -> list[str]:
@@ -100,12 +118,53 @@ class PalCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             if info is None:
                 continue
             source: dict[str, Any] = info if isinstance(status, Exception) else status
-            inputs: dict[int, str | None] = {}
-            for key, value in source.items():
-                if m := _INPUT_KEY.match(key):
-                    inputs[int(m.group(1))] = value
-            result[dev_id] = {"info": info, "inputs": inputs}
+            result[dev_id] = {"info": info, "inputs": _parse_inputs(source)}
         return result
+
+    # ------------------------------------------------------------------ MQTT
+    def set_mqtt_connected(self, connected: bool) -> None:
+        """Slow the regular poll down while push events are available."""
+        was = self.mqtt_connected
+        self.mqtt_connected = connected
+        if connected:
+            self.update_interval = max(
+                self._poll_interval, timedelta(seconds=MQTT_FALLBACK_INTERVAL)
+            )
+            if not was:  # resync: events may have been missed while offline
+                self.hass.async_create_task(self.async_request_refresh())
+        else:
+            self.update_interval = self._poll_interval
+        _LOGGER.debug("MQTT %s, poll interval %s", "connected" if connected else "down", self.update_interval)
+
+    def handle_device_event(self, device_id: str) -> None:
+        """The portal reported something for a device: read its input status."""
+        if device_id not in self.selected_ids or self.data is None:
+            return
+        for cancel in self._event_timers.pop(device_id, []):
+            cancel()
+
+        async def _refresh(_now: Any) -> None:
+            await self._async_refresh_device(device_id)
+
+        self._event_timers[device_id] = [
+            async_call_later(self.hass, delay, _refresh) for delay in EVENT_REFRESH_DELAYS
+        ]
+
+    async def _async_refresh_device(self, device_id: str) -> None:
+        current = (self.data or {}).get(device_id)
+        if current is None:
+            return
+        try:
+            status = await self.api.async_get_input_status(device_id)
+        except PalApiError as err:
+            _LOGGER.debug("Status of %s after MQTT event failed: %s", device_id, err)
+            await self.async_request_refresh()
+            return
+        inputs = _parse_inputs(status)
+        if inputs and inputs != current["inputs"]:
+            data = dict(self.data)
+            data[device_id] = {"info": current["info"], "inputs": inputs}
+            self.async_set_updated_data(data)
 
     def schedule_refreshes_after_open(self) -> None:
         """Poll a bit faster right after a gate was triggered."""
@@ -123,3 +182,7 @@ class PalCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         for cancel in self._pending:
             cancel()
         self._pending = []
+        for timers in self._event_timers.values():
+            for cancel in timers:
+                cancel()
+        self._event_timers = {}

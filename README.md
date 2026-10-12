@@ -36,7 +36,7 @@ Settings → Devices & services → PAL ES Gates → **Configure**:
 | Option | Meaning |
 | --- | --- |
 | Devices | Which devices are exposed. Un-ticked devices are removed from HA. |
-| Polling interval | 3–300 s, default 10 s. One request per selected device per poll. |
+| Polling interval | 3–300 s, default 10 s. Used only while MQTT push is not connected; otherwise the safety poll runs every 5 minutes. |
 | Icon (per relay) | Swing gate, up-and-over garage door or barrier. Open and closed icons differ. |
 | Input is inverted (per relay) | Off: input `active` = closed, `idle` = open. On: the opposite. |
 
@@ -54,11 +54,16 @@ Entities shown under **Favorites** are either the ones you pinned (*Add favorite
 
 ## How the state is determined
 
-The device reports its input to the PAL cloud. Home Assistant asks the portal for that status
-every polling interval (default 10 s), so a change shows up with a delay of up to one interval.
-Right after you press *Open* the status is read again after 3 s and 8 s. The portal's device
-list (names, connected flag) is refreshed every 5 minutes. There is no push channel, so the
-state is "as of the last poll".
+The device reports its input to the PAL cloud. The portal also publishes an MQTT event
+(`org/<orgId>/evt/device/<deviceId>/...`) whenever a device reports something. The integration
+listens to it (WebSocket, `wss://portal.pal-es.com/mqtt`, port 443, your own organisation's topics only);
+on an event it reads the input status of that one device, 1 s and 4 s later. So a change shows up
+within a couple of seconds and nothing is polled in between.
+
+As a safety net the status is still read every 5 minutes while MQTT is connected, and every
+*polling interval* (default 10 s) while it is not (portal unreachable, reconnecting). After you
+press *Open* the status is read again after 3 s and 8 s. The portal's device list (names,
+connected flag) is refreshed every 5 minutes.
 
 ## Dashboard examples
 

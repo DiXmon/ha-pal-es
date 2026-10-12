@@ -47,6 +47,7 @@ class PalApi:
         self._password = password
         self._token: str | None = None
         self._token_exp: float | None = None
+        self._org_id: str | None = None
         self._lock = asyncio.Lock()
         self._last_login: float = 0.0
         # Do not log in again because of a rejected request sooner than this
@@ -73,6 +74,8 @@ class PalApi:
             raise PalAuthError(msg or "login failed")
         self._token = token
         self._token_exp = _jwt_exp_seconds(token)
+        org = data["user"].get("orgId")
+        self._org_id = str(org) if org is not None else self._org_id
         self._last_login = time.time()
 
     def _token_valid(self) -> bool:
@@ -88,6 +91,11 @@ class PalApi:
         async with self._lock:
             if not self._token_valid():
                 await self.async_login()
+
+    async def async_get_mqtt_credentials(self) -> tuple[str, str | None, float | None]:
+        """Return (token, org id, token expiry in epoch seconds) for the MQTT broker."""
+        await self._ensure_token()
+        return self._token or "", self._org_id, self._token_exp
 
     # --------------------------------------------------------------- requests
     def _may_relogin(self) -> bool:

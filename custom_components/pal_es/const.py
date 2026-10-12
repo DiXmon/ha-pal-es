@@ -37,3 +37,13 @@ ICONS: dict[str, tuple[str, str]] = {
     "barrier": ("mdi:boom-gate", "mdi:boom-gate-up"),
 }
 DEFAULT_ICON_TYPE = "swing_gate"
+
+# MQTT push (the portal publishes an event when a device reports something).
+MQTT_URL = "wss://portal.pal-es.com/mqtt"
+MQTT_ORIGIN = "https://portal.pal-es.com"
+MQTT_USERNAME = "adminApp"  # the portal's web app logs in with this user name + the API token
+MQTT_KEEPALIVE = 30
+# While MQTT is connected, poll only this rarely (safety net for missed events).
+MQTT_FALLBACK_INTERVAL = 300
+# After an MQTT event for a device, read its input status after these delays (s).
+EVENT_REFRESH_DELAYS = (1, 4)

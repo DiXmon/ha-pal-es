@@ -9,6 +9,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import PalApi
 from .const import DOMAIN
 from .coordinator import PalConfigEntry, PalCoordinator
+from .mqtt import PalMqtt
 
 PLATFORMS = [Platform.COVER, Platform.BUTTON, Platform.BINARY_SENSOR]
 
@@ -24,6 +25,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: PalConfigEntry) -> bool:
     entry.runtime_data = coordinator
 
     _remove_deselected_devices(hass, entry, coordinator)
+
+    # Push channel: events from the portal trigger an immediate status read.
+    mqtt = PalMqtt(
+        async_get_clientsession(hass),
+        api,
+        coordinator.handle_device_event,
+        coordinator.set_mqtt_connected,
+    )
+    entry.async_create_background_task(hass, mqtt.async_run(), "pal_es_mqtt")
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_reload))
