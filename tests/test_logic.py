@@ -58,3 +58,11 @@ def test_legacy_global_invert_is_default():
     # explicit per-output value wins over the legacy global one
     options = {"invert_input": True, "outputs": {"DEV1:1": {"invert": False}}}
     assert logic.output_settings(options, "DEV1", 1)["invert"] is False
+
+
+def test_manifest_is_valid_json():
+    import json
+    from pathlib import Path
+
+    m = json.loads((Path(__file__).parent.parent / "custom_components" / "pal_es" / "manifest.json").read_text())
+    assert m["domain"] == "pal_es" and m["version"] and m["iot_class"] == "cloud_push"
